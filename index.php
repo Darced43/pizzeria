@@ -183,6 +183,5 @@ elseif ($requestMethod === 'GET' && preg_match('#^/orders$#', $requestUrl)) {
     
     http_response_code(200);
     echo json_encode($orders, JSON_UNESCAPED_UNICODE);
-    var_dump($doneFilter);
     exit;
 }
