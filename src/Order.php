@@ -4,21 +4,32 @@ namespace src;
 class Order
 {
     private static int $counter = 0;
-    private int $order_id;
+    private string $order_id;
     public array $items = [];
     public bool $done = false;
+
     public function __construct()
     {
         self::$counter++;
-        $this->setOrderId(self::$counter);
+        $this->order_id = substr(md5(uniqid()), 0, 15);
     }
 
-    public function getOrderId(): int
+    public static function getCounter(): int
+    {
+        return self::$counter;
+    }
+
+    // public function setCounter(int $counter): void
+    // {
+    //     $this->counter = $counter;
+    // }
+
+    public function getOrderId(): string
     {
         return $this->order_id;
     }
 
-    public function setOrderId(int $order_id): void
+    public function setOrderId(string $order_id): void
     {
         $this->order_id = $order_id;
     }
