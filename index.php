@@ -22,6 +22,23 @@ $requestUrl = $_SERVER['REQUEST_URI'];
 
 $order = new Order();
 
+function checkHeadKey(): void
+{
+    if (!isset($_SERVER['HTTP_X_AUTH_KEY']) || $_SERVER['HTTP_X_AUTH_KEY'] !== 'qwerty123') {
+        http_response_code(401);
+        echo json_encode(['error' => 'Missing or invalid X-Auth-Key']);
+        exit;
+    }
+}
+
+function getOrders(PDO $pdo, $valueId)
+{
+    $statement = $pdo->prepare("SELECT * FROM orders WHERE order_id = ?");
+    $statement->execute([$valueId]);
+    $result = $statement->fetch(PDO::FETCH_ASSOC);
+    return $result ?: false;
+}
+
 //создание нового заказа
 if ($requestMethod === 'POST' && $requestUrl === '/orders') {
 
@@ -50,7 +67,7 @@ if ($requestMethod === 'POST' && $requestUrl === '/orders') {
     http_response_code(200);
     echo json_encode([
         "order_id" => $orderId,
-        "items" => $body['items'], 
+        "items" => $body['items'],
         "done" => $done
     ], JSON_UNESCAPED_UNICODE);
 
@@ -58,10 +75,10 @@ if ($requestMethod === 'POST' && $requestUrl === '/orders') {
 }
 
 //изменение существующего
-elseif($requestMethod === 'POST' && preg_match('#^/orders/([a-f0-9]{15})/items$#', $requestUrl, $matches)){
+elseif($requestMethod === 'POST' && preg_match('#^/orders/([a-zA-Z0-9]{1,15})/items$#', $requestUrl, $matches)){
 
     $body = json_decode(file_get_contents('php://input'), true);
-    
+
     if (!is_array($body) || empty($body)) {
         http_response_code(400);
         echo json_encode(['error' => 'Items must be a non-empty array']);
@@ -69,38 +86,36 @@ elseif($requestMethod === 'POST' && preg_match('#^/orders/([a-f0-9]{15})/items$#
     }
 
     $orderId = $matches[1];
+    $order = getOrders($pdo, $orderId);
 
-    $statement = $pdo->prepare("SELECT * FROM orders WHERE order_id = ?");
-    $statement->execute([$orderId]);
-    $order = $statement->fetch(PDO::FETCH_ASSOC);
-
-    if (!$order) {
+    if (!is_array($order) || empty($order)) {
         http_response_code(404);
+        echo json_encode(['error' => 'Items must be a non-empty array']);
         exit;
     }
 
-    if ($order['done'] === true || $order['done'] === 1) {
+    if((int)$order['done'] === 1) {
+        echo json_encode(['error' => 'Items have the status of done']);
         http_response_code(400);
         exit;
     }
 
     $updateStmt = $pdo->prepare("UPDATE orders SET items = ? WHERE order_id = ?");
     $updateStmt->execute([json_encode($body), $orderId]);
+
     http_response_code(200);
     exit;
 }
 
 // Получение информации по конкретному заказу
-elseif($requestMethod === 'GET' && preg_match('#^/orders/([a-f0-9]{15})$#', $requestUrl, $matches)){
+elseif($requestMethod === 'GET' && preg_match('#^/orders/([a-zA-Z0-9]{1,15})$#', $requestUrl, $matches)){
 
     $orderId = $matches[1];
-    $statement = $pdo->prepare("SELECT * FROM orders WHERE order_id = ?");
-    $statement->execute([$orderId]);
-    $order = $statement->fetch(PDO::FETCH_ASSOC);
+    $order = getOrders($pdo, $orderId);
 
     if (!is_array($order) || empty($order)) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Items must be a non-empty array']);
+        http_response_code(404);
+        echo json_encode(['error' => 'Order not found']);
         exit;
     }
 
@@ -108,7 +123,7 @@ elseif($requestMethod === 'GET' && preg_match('#^/orders/([a-f0-9]{15})$#', $req
     http_response_code(200);
     echo json_encode([
         "order_id" => $order['order_id'],
-        "items" => $order['items'], 
+        "items" => json_decode($order['items'], true),
         "done" => $orderDone
     ], JSON_UNESCAPED_UNICODE);
 
@@ -116,44 +131,35 @@ elseif($requestMethod === 'GET' && preg_match('#^/orders/([a-f0-9]{15})$#', $req
 }
 
 // Повар помечает заказ как выполненный.
-elseif($requestMethod === 'POST' && preg_match('#^/orders/([a-f0-9]{15})/done$#', $requestUrl, $matches)){
-    
-    if (!isset($_SERVER['HTTP_X_AUTH_KEY']) || $_SERVER['HTTP_X_AUTH_KEY'] !== 'qwerty123') {
-        http_response_code(401); 
-        echo json_encode(['error' => 'Missing or invalid X-Auth-Key']);
-        exit;
-    }
+elseif($requestMethod === 'POST' && preg_match('#^/orders/([a-zA-Z0-9]{1,15})/done$#', $requestUrl, $matches)){
+
+    checkHeadKey();
 
     $orderId = $matches[1];
-    $statement = $pdo->prepare("SELECT * FROM orders WHERE order_id = ?");
-    $statement->execute([$orderId]);
-    $order = $statement->fetch(PDO::FETCH_ASSOC);
+    $order = getOrders($pdo, $orderId);
 
-    if (!$order) {
+    if (!is_array($order) || empty($order)) {
         http_response_code(404);
         echo json_encode(['error' => 'Items not found']);
         exit;
     }
 
-    if ($order['done'] === true || $order['done'] === 1) {
+    if((int)$order['done'] === 1) {
         http_response_code(400);
         echo json_encode(['error' => 'Items have the status of done']);
         exit;
     }
-    
+
     $updateStmt = $pdo->prepare("UPDATE orders SET done = ? WHERE order_id = ?");
     $updateStmt->execute([1, $orderId]);
     http_response_code(200);
+    exit;
 }
 
 // Получение списка всех заказов.
 if ($requestMethod === 'GET' && preg_match('#^/orders(\?.*)?$#', $requestUrl)) {
 
-    if (!isset($_SERVER['HTTP_X_AUTH_KEY']) || $_SERVER['HTTP_X_AUTH_KEY'] !== 'qwerty123') {
-        http_response_code(401); 
-        echo json_encode(['error' => 'Missing or invalid X-Auth-Key']);
-        exit;
-    }
+    checkHeadKey();
 
     $doneFilter = null;
     if (isset($_GET['done'])) {
@@ -168,7 +174,7 @@ if ($requestMethod === 'GET' && preg_match('#^/orders(\?.*)?$#', $requestUrl)) {
         $statement = $pdo->prepare("SELECT * FROM orders WHERE done = ?");
         $statement->execute([$doneFilter]);
     } else {
-        $statement = $pdo->query("SELECT * FROM orders");
+        throw new InvalidArgumentException('Invalid value id');
     }
     $orders = $statement->fetchAll(PDO::FETCH_ASSOC);
 
@@ -180,8 +186,12 @@ if ($requestMethod === 'GET' && preg_match('#^/orders(\?.*)?$#', $requestUrl)) {
         echo json_encode([]);
         exit;
     }
-    
+
     http_response_code(200);
     echo json_encode($orders, JSON_UNESCAPED_UNICODE);
     exit;
 }
+
+http_response_code(404);
+echo json_encode(['error' => 'Route not found']);
+exit;
