@@ -1,28 +1,18 @@
 <?php
 
 namespace src;
+use InvalidArgumentException;
+
 class Order
 {
-    private static int $counter = 0;
     private string $order_id;
     public array $items = [];
     public bool $done = false;
 
     public function __construct()
     {
-        self::$counter++;
         $this->order_id = substr(md5(uniqid()), 0, 15);
     }
-
-    public static function getCounter(): int
-    {
-        return self::$counter;
-    }
-
-    // public function setCounter(int $counter): void
-    // {
-    //     $this->counter = $counter;
-    // }
 
     public function getOrderId(): string
     {
@@ -41,6 +31,11 @@ class Order
 
     public function setItems(array $items): void
     {
+        foreach ($items as $item){
+            if(!is_int($item) || $item < 1 || $item > 5000){
+                throw new InvalidArgumentException('Element invalid value');
+            }
+        }
         $this->items = $items;
     }
 
