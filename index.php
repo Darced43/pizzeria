@@ -152,7 +152,6 @@ if ($requestMethod === 'GET' && preg_match('#^/orders(\?.*)?$#', $requestUrl)) {
     if (!isset($_SERVER['HTTP_X_AUTH_KEY']) || $_SERVER['HTTP_X_AUTH_KEY'] !== 'qwerty123') {
         http_response_code(401); 
         echo json_encode(['error' => 'Missing or invalid X-Auth-Key']);
-        echo 'bingo';
         exit;
     }
 
